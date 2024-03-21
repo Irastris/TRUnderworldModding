@@ -14,8 +14,8 @@ import click
 
 # Global variables
 FORMATS = { # FourCC, RGBBitCount, PixelFormat
-    "DXT1": (827611204, 0, 71), # BC1_UNORM
-    "DXT5": (894720068, 8, 77) # BC3_UNORM
+    "DXT1": (827611204, 0), # BC1_UNORM
+    "DXT5": (894720068, 8) # BC3_UNORM
 }
 
 # Struct Functions
@@ -188,52 +188,6 @@ def cli():
 
 @cli.command()
 @click.argument("path")
-def export(path):
-    """ Extract texture data from a given PCD9 and save it as DDS """
-    print(f"Processing {path}")
-    
-    pcd9 = PCD9()
-    
-    with open(f"{os.path.splitext(path)[0]}.dds", "wb") as dds: # Write data to DDS
-        dds.write(packLong(542327876)) # Magic
-        dds.write(packLong(124)) # Structure size
-        dds.write(packLong(659463)) # Flags
-        dds.write(packLong(pcd9.height)) # Height
-        dds.write(packLong(pcd9.width)) # Width
-        dds.write(packLong(pcd9.width * pcd9.height * FORMATS[pcd9.format][1] // 8)) # First mip length
-        dds.write(packLong(0)) # Depth
-        dds.write(packLong(pcd9.mipCount)) # Mips
-        dds.seek(44, 1) # Skip to DDS_PIXELFORMAT
-        dds.write(packLong(32)) # Structure size
-        dds.write(packLong(4)) # Flags
-        dds.write(packLong(FORMATS[pcd9.format][0])) # FourCC
-        dds.seek(20, 1)
-        dds.write(packLong(4198408))
-        dds.seek(16, 1)
-        if FORMATS[pcd9.format][0] == 808540228: # Check if an extended DXT10 header is needed
-            dds.write(packLong(FORMATS[pcd9.format][2])) # Format
-            dds.write(packLong(3)) # Resource Dimension
-            dds.write(packLong(0)) # Misc. Flag
-            dds.write(packLong(1)) # Array Size
-            dds.write(packLong(0)) # Misc. Flag 2
-        dds.write(pcd9.data)
-    
-    return
-
-@cli.command()
-@click.argument("path")
-def inject(path):
-    """ Reimport texture data from a given DDS into the original PCD9, saving as a new file """
-    print(f"Processing {path}")
-    
-    pcd9 = PCD9()
-    pcd9.readPCD9(path)
-    
-    dds = DDS()
-    dds.readDDS(path)
-
-@cli.command()
-@click.argument("path")
 def convert(path):
     """ Convert PCD9 to DDS, or DDS to PCD9."""
     print(f"Processing {path}")
@@ -261,12 +215,6 @@ def convert(path):
         
         case default:
             print("Input does not have a known extension!")
-
-@cli.command()
-@click.argument("path")
-def testing(path):
-    dds = DDS()
-    dds.readPCD9(path)
 
 if __name__ == "__main__":
     cli()
