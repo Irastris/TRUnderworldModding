@@ -1,5 +1,5 @@
 1. Extract a DRM to use as a base, for example lara_jungle_a.
 2. Make your desired edits to the mesh/textures.
-3. Open the .obj in a hex editor and change two bytes to the ID for the desired costume slot, for example slot J which is 0x1D. Refer to the objectlist for the slot IDs in int form.
+3. Open the .obj in a hex editor and change the two bytes at 0x10 and 0x4C to the ID for the desired costume slot, for example slot J which is 0x1D. Refer to the objectlist for the slot IDs in int form.
 4. Rename both the .obj and its corresponding entry in the DRM's sectionList.txt to have that ID as well, for slot J this would be 0_1d.obj.
 5. Package your DRM and rename it, for slot J this would be dlc_costume_j.drm. Add it to the hook's mods folder and optionally create a thumbnail to match.
