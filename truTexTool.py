@@ -5,7 +5,8 @@
 # https://docs.microsoft.com/en-us/windows/win32/api/dxgiformat/ne-dxgiformat-dxgi_format
 
 # System Imports
-import os, re
+import os, re, subprocess
+from glob import glob
 from pathlib import Path
 from struct import pack, unpack
 
@@ -74,7 +75,7 @@ class PCD9:
             self.flags = unpackChar(fh)
             self.mipCount = unpackChar(fh)
             self.type = unpackShort(fh)
-            self.data = fh.read(size)
+            self.data = fh.read(self.size)
     
     def readDDS(self, path):
         with open(path, "rb") as fh:
@@ -93,7 +94,6 @@ class PCD9:
     
     def writePCD9(self, path):
         id = int(re.findall("[0-9]+_([0-9a-f]+)", str(path))[-1], 16)
-        print(id)
         with open(path, "wb") as fh:
             fh.write(b"SECT")
             fh.seek(4, 1)
@@ -187,34 +187,74 @@ def cli():
     pass
 
 @cli.command()
-@click.argument("path")
-def convert(path):
+@click.argument("path", nargs=-1)
+@click.option("--cleanup", is_flag=True, default=False)
+def convert(path, cleanup):
     """ Convert PCD9 to DDS, or DDS to PCD9."""
-    print(f"Processing {path}")
     
-    inpath = Path(path)
-    extension = inpath.suffix
+    filenames = []
+    for filename in path:
+        # Handle shells that do not support globbing
+        expanded = list(glob(filename))
+        if len(expanded) == 0 and "*" not in filename:
+            raise(click.BadParameter(f"{filename}: file not found"))
+        filenames.extend(expanded)
     
-    match extension:
-        case ".tr8pcd9":
-            outpath = Path(f"{inpath.stem}.dds")
-            
-            out = DDS()
-            out.readPCD9(inpath)
-            out.writeDDS(outpath)
+    for file in filenames:
+        inpath = Path(file)
+        if not inpath.exists():
+            print(f"{file} does not exist!")
         
-        case ".dds":
-            outpath = Path(f"{inpath.stem}.tr8pcd9")
+        print(f"Processing {file}")
+        
+        match inpath.suffix:
+            case ".tr8pcd9":
+                outpath = Path(f"{inpath.stem}.dds")
+                
+                out = DDS()
+                out.readPCD9(inpath)
+                out.writeDDS(outpath)
             
-            if outpath.exists():
+            case ".dds":
+                outpath = Path(f"{inpath.stem}.tr8pcd9")
+                
+                if outpath.exists():
+                    outpath = Path(f"{inpath.stem}_new.tr8pcd9")
+                
+                out = PCD9()
+                out.readDDS(inpath)
+                out.writePCD9(outpath)
+            
+            case ".png":
+                pcd9path = Path(f"{inpath.stem}.tr8pcd9")
+                
+                if not pcd9path.exists():
+                    print(f"No corresponding PCD9 found for {inpath} to determine conversion settings! Skipping...")
+                    continue
+                
+                pcd9 = PCD9()
+                pcd9.readPCD9(pcd9path)
+                
+                subprocess.call([
+                    "texconv.exe",
+                    "-f", pcd9.format,
+                    "-m", "8", # str(pcd9.mipCount) -- TODO: Hardcoded to 8 as more seem to crash with some textures
+                    "-y",
+                    str(inpath.resolve()),
+                ], stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+                
+                ddsPath = Path(f"{inpath.stem}.dds")
                 outpath = Path(f"{inpath.stem}_new.tr8pcd9")
+                
+                out = PCD9()
+                out.readDDS(ddsPath)
+                out.writePCD9(outpath)
+                
+                if cleanup:
+                    ddsPath.unlink()
             
-            out = PCD9()
-            out.readDDS(inpath)
-            out.writePCD9(outpath)
-        
-        case default:
-            print("Input does not have a known extension!")
+            case default:
+                print("Input does not have a known extension!")
 
 if __name__ == "__main__":
     cli()
